@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mighty Pong</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      color: white;
+    }
+    canvas {
+      display: block;
+      background: linear-gradient(90deg, #001f3f, #003366);
+    }
+    #message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 2em;
+      display: none;
+      text-shadow: 0 0 10px #00ff00;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="pongCanvas"></canvas>
+  <div id="message"></div>
+  <script>
+    const canvas = document.getElementById("pongCanvas");
+    const ctx = canvas.getContext("2d");
+    const messageDiv = document.getElementById("message");
+
+    // Set canvas size
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // Game variables
+    let ball, paddle, score, gameOver, inDemoMode, titleFlash;
+
+    function resetGame(demo = true) {
+      ball = { x: canvas.width / 2, y: canvas.height / 2, radius: 10, dx: 4, dy: 4 };
+      paddle = { width: 150, height: 10, x: (canvas.width - 150) / 2, y: canvas.height - 30, dx: 0, speed: 6 };
+      score = 0;
+      gameOver = false;
+      inDemoMode = demo; // Set demo mode
+      titleFlash = true; // Enable title flashing
+      messageDiv.style.display = demo ? "block" : "none";
+      messageDiv.innerText = demo ? "Tap the Screen or Press Space to Start!" : "";
+      gameLoop();
+    }
+
+    // Control variables
+    let isTouchActive = false;
+    let touchX = 0;
+
+    // Listen for keyboard events
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft" && !inDemoMode) paddle.dx = -paddle.speed;
+      if (e.key === "ArrowRight" && !inDemoMode) paddle.dx = paddle.speed;
+      if (e.key === " " && (inDemoMode || gameOver)) resetGame(false); // Exit demo mode or restart game
+    });
+
+    window.addEventListener("keyup", () => {
+      if (!inDemoMode) paddle.dx = 0;
+    });
+
+    // Add touchstart event listener to handle starting or restarting the game
+    canvas.addEventListener("touchstart", (e) => {
+      if (inDemoMode || gameOver) {
+        resetGame(false);
+      } else {
+        isTouchActive = true;
+        touchX = e.touches[0].clientX;
+      }
+    });
+
+    canvas.addEventListener("touchmove", (e) => {
+      if (isTouchActive && !inDemoMode) {
+        touchX = e.touches[0].clientX;
+      }
+    });
+
+    canvas.addEventListener("touchend", () => {
+      if (!inDemoMode) isTouchActive = false;
+    });
+
+    function drawBall() {
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fillStyle = "#00ff00";
+      ctx.fill();
+      ctx.closePath();
+    }
+
+    function drawPaddle() {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+    }
+
+    function drawScoreAndTitle() {
+      // Flashing "MIGHTY PONG" title
+      if (titleFlash) {
+        ctx.font = "20px Arial";
+        ctx.fillStyle = "#00ff00";
+        ctx.fillText("MIGHTY PONG", 20, 30);
+      }
+
+      // Toggle flash state every frame
+      titleFlash = !titleFlash;
+
+      // Draw score
+      if (!inDemoMode) {
+        ctx.font = "20px Arial";
+        ctx.fillStyle = "white";
+        ctx.fillText(`Score: ${score}`, 200, 30);
+      }
+    }
+
+    function updatePaddle() {
+      if (inDemoMode) {
+        // In demo mode, paddle automatically follows the ball
+        const targetX = ball.x - paddle.width / 2;
+        paddle.x += (targetX - paddle.x) * 0.1; // Smooth movement
+      } else if (isTouchActive) {
+        paddle.x = touchX - paddle.width / 2;
+      } else {
+        paddle.x += paddle.dx;
+      }
+
+      // Prevent paddle from going out of bounds
+      if (paddle.x < 0) paddle.x = 0;
+      if (paddle.x + paddle.width > canvas.width) paddle.x = canvas.width - paddle.width;
+    }
+
+    function updateBall() {
+      ball.x += ball.dx;
+      ball.y += ball.dy;
+
+      // Ball collision with walls
+      if (ball.x < ball.radius || ball.x > canvas.width - ball.radius) {
+        ball.dx *= -1;
+      }
+      if (ball.y < ball.radius) {
+        ball.dy *= -1;
+      }
+
+      // Ball collision with paddle
+      if (
+        ball.x > paddle.x &&
+        ball.x < paddle.x + paddle.width &&
+        ball.y + ball.radius > paddle.y
+      ) {
+        ball.dy *= -1;
+        if (!inDemoMode) score++;
+      }
+
+      // Ball goes out of bounds
+      if (ball.y > canvas.height) {
+        if (inDemoMode) {
+          resetGame(true); // Restart demo mode if ball falls
+        } else {
+          gameOver = true;
+          messageDiv.innerText = score >= 3 ? "You Win! Tap Screen or Press Space to Restart." : "Try Again! Tap Screen or Press Space to Restart.";
+          messageDiv.style.display = "block";
+        }
+      }
+    }
+
+    function drawBackground() {
+      ctx.fillStyle = "#001f3f";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw futuristic grid lines
+      ctx.strokeStyle = "#003366";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < canvas.width; i += 50) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, canvas.height);
+        ctx.stroke();
+      }
+      for (let i = 0; i < canvas.height; i += 50) {
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(canvas.width, i);
+        ctx.stroke();
+      }
+    }
+
+    function gameLoop() {
+      if (gameOver) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      drawBackground();
+      drawBall();
+      drawPaddle();
+      drawScoreAndTitle();
+
+      updatePaddle();
+      updateBall();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    resetGame(true); // Start in demo mode
+  </script>
+</body>
+</html>
